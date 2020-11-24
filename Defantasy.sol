@@ -7,6 +7,12 @@ contract Defantasy {
     uint256 public constant MAP_H = 100;
     uint256 public constant TOTAL = MAP_W * MAP_H;
 
+    address payable public author;
+
+    constructor() public {
+        author = msg.sender;
+    }
+
     address[] public participants;
     mapping(address => bool) public participated;
     mapping(address => uint256) private energies;
@@ -23,6 +29,9 @@ contract Defantasy {
         energies[msg.sender] += quantity;
         assert(energies[msg.sender] >= quantity);
         participate();
+
+        // 3.75% fee.
+        author.transfer((msg.value / 10000) * 375);
     }
 
     struct Support {
