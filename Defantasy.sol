@@ -2,7 +2,9 @@
 pragma solidity ^0.7.5;
 
 contract Defantasy {
-    uint256 public constant ENERGY_PRICE = 1000000000000000;
+    uint256 public constant ENERGY_PRICE = 100000000000000;
+    uint256 public constant SUMMON_ENERGY = 10;
+    uint256 public constant MOVE_ENERGY = 1;
     uint256 public constant MAP_W = 100;
     uint256 public constant MAP_H = 100;
     uint256 public constant TOTAL = MAP_W * MAP_H;
@@ -41,7 +43,7 @@ contract Defantasy {
     mapping(address => Support[]) private supported;
 
     function support(address to, uint256 quantity) external {
-        assert(quantity <= energies[msg.sender]);
+        require(quantity <= energies[msg.sender]);
         energies[msg.sender] -= quantity;
 
         energies[to] += quantity;
@@ -52,7 +54,7 @@ contract Defantasy {
 
     uint256 public season = 1;
 
-    enum ArmyKind {Fire, Water, Wind, Earth, Light, Dark}
+    enum ArmyKind {Light, Fire, Water, Wind, Earth, Dark}
     struct Army {
         ArmyKind kind;
         uint256 count;
@@ -66,7 +68,24 @@ contract Defantasy {
         uint8 y,
         ArmyKind kind,
         uint256 count
-    ) external {}
+    ) external {
+        require(x < MAP_W);
+        require(y < MAP_H);
+        require(kind >= ArmyKind.Light && kind <= ArmyKind.Dark);
+        require(energies[msg.sender] >= count * SUMMON_ENERGY);
+        require(map[y][x].owner == address(0));
+
+        // must first time.
+        for (uint8 mapY = 0; mapY < MAP_H; mapY += 1) {
+            for (uint8 mapX = 0; mapX < MAP_W; mapX += 1) {
+                if (map[mapY][mapX].owner == msg.sender) {
+                    revert();
+                }
+            }
+        }
+
+        map[y][x] = Army({kind: kind, count: count, owner: msg.sender});
+    }
 
     function attack(
         uint8 fromX,
