@@ -5,13 +5,13 @@ contract Defantasy {
     uint256 public constant ENERGY_PRICE = 100000000000000;
     uint256 public constant SUMMON_ENERGY = 10;
     uint256 public constant MOVE_ENERGY = 1;
-    uint256 public constant MAP_W = 100;
-    uint256 public constant MAP_H = 100;
+    uint256 public constant MAP_W = 9;
+    uint256 public constant MAP_H = 9;
     uint256 public constant TOTAL = MAP_W * MAP_H;
 
     address payable public author;
 
-    constructor() public {
+    constructor() {
         author = msg.sender;
     }
 
@@ -60,7 +60,7 @@ contract Defantasy {
         uint256 count;
         address owner;
     }
-    Army[][] public map;
+    Army[MAP_H][MAP_W] public map;
     mapping(address => uint16) private occupied;
 
     function enter(
@@ -85,6 +85,7 @@ contract Defantasy {
         }
 
         map[y][x] = Army({kind: kind, count: count, owner: msg.sender});
+        occupied[msg.sender] = 1;
     }
 
     function attack(
@@ -93,6 +94,36 @@ contract Defantasy {
         uint8 toX,
         uint8 toY
     ) external {
+        require(fromX < MAP_W);
+        require(fromY < MAP_H);
+        require(toX < MAP_W);
+        require(toY < MAP_H);
+        require(map[fromY][fromX].owner == msg.sender);
+
+        require(
+            (fromX < toX ? toX - fromX : fromX - toX) +
+            (fromY < toY ? toY - fromY : fromY - toY) == 1
+        );
+
+        // move.
+        if (map[toY][toX].owner == address(0)) {
+            map[toY][toX] = map[fromY][fromX];
+            delete map[fromY][fromX];
+        }
+
+        // combine.
+        else if (map[toY][toX].owner == msg.sender) {
+            require(map[toY][toX].kind == map[fromY][fromX].kind);
+            map[toY][toX].count += map[fromY][fromX].count;
+            assert(map[toY][toX].count >= map[fromY][fromX].count);
+            delete map[fromY][fromX];
+        }
+        
+        // attack.
+        else {
+            
+        }
+
         // win.
         if (occupied[msg.sender] == TOTAL) {
             reward(msg.sender);
