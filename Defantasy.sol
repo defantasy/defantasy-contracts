@@ -88,6 +88,57 @@ contract Defantasy {
         occupied[msg.sender] = 1;
     }
 
+    function calculateDamage(Army memory from, Army memory to) pure internal returns(uint256) {
+
+        uint256 damage = from.count;
+
+        // Light -> *2 -> Dark
+        if (from.kind == ArmyKind.Light) {
+            if (to.kind == ArmyKind.Dark) {
+                damage *= 2;
+		        assert(damage / 2 == from.count);
+            }
+        }
+        
+        // Dark -> *1.25 -> Fire, Water, Wind, Earth
+        else if (from.kind == ArmyKind.Dark) {
+            if (
+                to.kind == ArmyKind.Fire ||
+                to.kind == ArmyKind.Water ||
+                to.kind == ArmyKind.Wind ||
+                to.kind == ArmyKind.Earth
+            ) {
+                damage = damage * 125;
+		        assert(damage / 125 == from.count);
+                damage /= 100;
+            }
+        }
+
+        // Fire, Water, Wind, Earth -> *1.25 -> Light
+        else if (to.kind == ArmyKind.Light) {
+            damage = damage * 125;
+            assert(damage / 125 == from.count);
+            damage /= 100;
+        }
+
+        // Fire -> *1.5 -> Wind
+        // Wind -> *1.5 -> Earth
+        // Earth -> *1.5 -> Water
+        // Water -> *1.5 -> Fire
+        else if (
+            (from.kind == ArmyKind.Fire && to.kind == ArmyKind.Wind) ||
+            (from.kind == ArmyKind.Wind && to.kind == ArmyKind.Earth) ||
+            (from.kind == ArmyKind.Earth && to.kind == ArmyKind.Water) ||
+            (from.kind == ArmyKind.Water && to.kind == ArmyKind.Fire)
+        ) {
+            damage = damage * 15;
+            assert(damage / 15 == from.count);
+            damage /= 10;
+        }
+
+        return damage;
+    }
+
     function attack(
         uint8 fromX,
         uint8 fromY,
@@ -98,30 +149,57 @@ contract Defantasy {
         require(fromY < MAP_H);
         require(toX < MAP_W);
         require(toY < MAP_H);
-        require(map[fromY][fromX].owner == msg.sender);
 
         require(
             (fromX < toX ? toX - fromX : fromX - toX) +
             (fromY < toY ? toY - fromY : fromY - toY) == 1
         );
 
+        Army storage from = map[fromY][fromX];
+        Army storage to = map[toY][toX];
+
+        require(from.owner == msg.sender);
+
         // move.
-        if (map[toY][toX].owner == address(0)) {
-            map[toY][toX] = map[fromY][fromX];
+        if (to.owner == address(0)) {
+            map[toY][toX] = from;
             delete map[fromY][fromX];
         }
 
         // combine.
-        else if (map[toY][toX].owner == msg.sender) {
-            require(map[toY][toX].kind == map[fromY][fromX].kind);
-            map[toY][toX].count += map[fromY][fromX].count;
-            assert(map[toY][toX].count >= map[fromY][fromX].count);
+        else if (to.owner == msg.sender) {
+            require(to.kind == from.kind);
+            to.count += from.count;
+            assert(to.count >= from.count);
+            
+            occupied[msg.sender] -= 1;
             delete map[fromY][fromX];
         }
         
         // attack.
         else {
+            uint256 fromDamage = calculateDamage(from, to);
+            uint256 toDamage = calculateDamage(to, from);
+
+            if (fromDamage >= to.count) {
+                occupied[to.owner] -= 1;
+                delete map[toY][toX];
+            } else {
+                to.count -= fromDamage;
+            }
             
+            if (toDamage >= from.count) {
+                occupied[msg.sender] -= 1;
+                delete map[fromY][fromX];
+            } else {
+                from.count -= toDamage;
+            }
+
+            // occupy.
+            if (from.owner == msg.sender && to.owner == address(0)) {
+                map[toY][toX] = from;
+                delete map[fromY][fromX];
+            }
         }
 
         // win.
